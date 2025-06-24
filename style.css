@@ -54,6 +54,6 @@ main {
     background-color: #5a5a5a;
     /* Usamos el pseudoelemento ::before para poner el caracter sin tocar el HTML */
     /* Así, en el futuro, podemos poner un enano u otro objeto en el mismo tile */
-    content: "#"; 
+  
     color: #888;
 }
