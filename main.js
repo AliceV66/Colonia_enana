@@ -2,27 +2,66 @@
 const WORLD_WIDTH = 40;
 const WORLD_HEIGHT = 25;
 
+
 // --- MODELOS DE DATOS GLOBALES ---
 let worldData = [];
 const agents = [];
 const taskQueue = [];
+const resources = {
+    rock: 0
+};
 
 // --- LÓGICA DEL MODELO ---
 
 function generateWorld() {
     const world = [];
+    const ROCK_CHANCE = 0.15; // 15% de probabilidad de que un tile de suelo sea roca
+
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         const row = [];
         for (let x = 0; x < WORLD_WIDTH; x++) {
-            let tileType = 'floor';
+            let tileType;
+            // Poner rocas en los bordes para crear las paredes
             if (x === 0 || x === WORLD_WIDTH - 1 || y === 0 || y === WORLD_HEIGHT - 1) {
                 tileType = 'rock';
+            } else {
+                // --- LÓGICA MODIFICADA ---
+                // Para el interior, hay una probabilidad de que sea roca en lugar de suelo
+                if (Math.random() < ROCK_CHANCE) {
+                    tileType = 'rock';
+                } else {
+                    tileType = 'floor';
+                }
             }
-            row.push({ type: tileType });
+            // Inicializamos el tile con su tipo y sin tarea asignada
+            row.push({ type: tileType, isTasked: false });
         }
         world.push(row);
     }
+    console.log("Mundo generado en memoria:", world);
     return world;
+}
+function renderUI(agentsData, resourcesData) {
+    // Renderizar panel de recursos
+    const resourcesPanel = document.getElementById('resources-panel');
+    resourcesPanel.innerHTML = `Piedra: ${resourcesData.rock}`;
+
+    // Renderizar panel de estado de agentes
+    const agentsPanel = document.getElementById('agents-panel');
+    agentsPanel.innerHTML = ''; // Limpiar antes de volver a dibujar
+
+    agentsData.forEach(agent => {
+        let statusText = agent.status;
+        
+        // ASEGÚRATE DE QUE ESTA LÍNEA USE BACKTICKS (COMILLAS INVERTIDAS)
+        if ((agent.status === 'walking-to-task' || agent.status === 'working') && agent.task) {
+            statusText += ` (${agent.task.type} en ${agent.task.x},${agent.task.y})`;
+        }
+        
+        const agentLi = document.createElement('li');
+        agentLi.innerHTML = `<strong>${agent.name}:</strong> ${statusText}`;
+        agentsPanel.appendChild(agentLi);
+    });
 }
 
 function createAgent(x, y) {
@@ -128,12 +167,13 @@ function runAgentAI(agent, world) {
 
         case 'working':
             if (!agent.task) { agent.status = 'idle'; return; }
-            console.log(`${agent.name} está minando en (${agent.task.x}, ${agent.task.y})`);
+            console.log('${agent.name} está minando en (${agent.task.x}, ${agent.task.y})');
             
             const minedTile = world[agent.task.y][agent.task.x];
             if (minedTile.type === 'rock') {
                 minedTile.type = 'floor';
                 minedTile.isTasked = false; // Desmarcamos el tile
+                resources.rock++; // ¡Ganas una de piedra!
             
             }
 
@@ -184,11 +224,14 @@ function renderWorld(world, agentsData) {
 function updateGame() {
     updateAgents(worldData, agents);
     renderWorld(worldData, agents);
+    renderUI(agents, resources);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     worldData = generateWorld();
-    createAgent(10, 5);
+    for (let i = 0; i < 3; i++) {
+        createAgent(10 + i, 5); // Crea 3 enanos en (10,5), (11,5) y (12,5)
+    }
     renderWorld(worldData, agents);
 
     const worldContainer = document.getElementById('game-world');
