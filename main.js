@@ -1,163 +1,206 @@
 // --- CONFIGURACIÓN Y CONSTANTES ---
-const WORLD_WIDTH = 40;  // Ancho del mundo en tiles
-const WORLD_HEIGHT = 25; // Alto del mundo en tiles
+const WORLD_WIDTH = 40;
+const WORLD_HEIGHT = 25;
 
-// --- NUEVO: Contenedor para los Agentes ---
-const agents = []; 
+// --- MODELOS DE DATOS GLOBALES ---
+let worldData = [];
+const agents = [];
+const taskQueue = [];
 
-// --- MODELO DE DATOS (DATA MODEL) ---
+// --- LÓGICA DEL MODELO ---
 
-/**
- * Genera la estructura de datos para un nuevo mundo.
- * Por ahora, crea una habitación vacía con paredes de roca.
- * @returns {Array<Array<Object>>} Un array 2D de objetos "tile".
- */
 function generateWorld() {
     const world = [];
-
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         const row = [];
         for (let x = 0; x < WORLD_WIDTH; x++) {
-            let tileType = 'floor'; // Por defecto, todo es suelo
-
-            // Poner rocas en los bordes para crear las paredes
+            let tileType = 'floor';
             if (x === 0 || x === WORLD_WIDTH - 1 || y === 0 || y === WORLD_HEIGHT - 1) {
                 tileType = 'rock';
             }
-            
             row.push({ type: tileType });
         }
         world.push(row);
     }
-    console.log("Mundo generado en memoria:", world);
     return world;
 }
 
-/**
- * --- NUEVO: Crea un nuevo agente (enano) y lo añade a la lista de agentes.
- * @param {number} x - Posición inicial en el eje X.
- * @param {number} y - Posición inicial en el eje Y.
- */
 function createAgent(x, y) {
-    console.log(`Creando enano en la posición <span class="math-inline">\{x\},</span>{y}`);
     const agent = {
-        id: agents.length + 1, // ID único
+        id: agents.length + 1,
         name: `Urist McEnano #${agents.length + 1}`,
-        char: '@', // El caracter que lo representa
-        color: '#ffeb3b', // Un color amarillo para que destaque
+        char: '@',
+        color: '#ffeb3b',
         x: x,
         y: y,
         status: 'idle'
     };
     agents.push(agent);
 }
+
+function createTask(x, y, type) {
+    
+    if (taskQueue.some(task => task.x === x && task.y === y)) return;
+    worldData[y][x].isTasked = true; // Marcamos el tile como "en cola"
+    const task = { type, x, y };
+    console.log(`Nueva tarea creada: ${type} en (${x}, ${y})`);
+    taskQueue.push(task);
+}
+
 /**
  * --- NUEVO ---
  * Intenta mover un agente en una dirección, verificando colisiones.
  * @param {Object} agent - El agente a mover.
  * @param {Array<Array<Object>>} worldData - Los datos del mundo para la colisión.
- * @param {number} dx - El cambio en X (-1 para izq, 1 para der, 0 si no hay mov).
- * @param {number} dy - El cambio en Y (-1 para arriba, 1 para abajo, 0 si no hay mov).
+ * @param {number} dx - El cambio en X.
+ * @param {number} dy - El cambio en Y.
  */
-function moveAgent(agent, worldData, dx, dy) {
+function moveAgent(agent, world, dx, dy) {
     const newX = agent.x + dx;
     const newY = agent.y + dy;
 
-    // Verificación de límites del mundo (nunca debería pasar con las paredes, pero es buena práctica)
-    if (newX < 0 || newX >= WORLD_WIDTH || newY < 0 || newY >= WORLD_HEIGHT) {
-        return; 
+    // Intento 1: Moverse en diagonal (si se requiere)
+    if (dx !== 0 && dy !== 0) {
+        if (world[newY][newX].type !== 'rock') {
+            agent.x = newX;
+            agent.y = newY;
+            return; // Movimiento exitoso
+        }
     }
 
-    // Detección de Colisiones
-    const targetTile = worldData[newY][newX];
-    if (targetTile.type !== 'rock') {
-        // Si no es una roca, actualizamos la posición del agente
-        agent.x = newX;
-        agent.y = newY;
-    } else {
-        console.log(`¡Auch! ${agent.name} se chocó contra una pared.`);
+    // Intento 2: Moverse horizontalmente (si se requiere)
+    if (dx !== 0) {
+        if (world[agent.y][newX].type !== 'rock') {
+            agent.x = newX;
+            return; // Movimiento exitoso
+        }
+    }
+    
+    // Intento 3: Moverse verticalmente (si se requiere)
+    if (dy !== 0) {
+        if (world[newY][agent.x].type !== 'rock') {
+            agent.y = newY;
+            return; // Movimiento exitoso
+        }
+    }
+    
+    // Si todos los intentos fallan, el agente no se mueve en este tick.
+    console.log(`¡Auch! ${agent.name} está bloqueado y no se puede mover.`);
+}
+
+// --- LÓGICA DE AGENTES (IA) ---
+
+function updateAgents(world, agentsData) {
+    agentsData.forEach(agent => {
+        runAgentAI(agent, world);
+    });
+}
+
+function runAgentAI(agent, world) {
+    switch (agent.status) {
+        case 'idle':
+            if (taskQueue.length > 0) {
+                agent.task = taskQueue.shift();
+                agent.status = 'walking-to-task';
+                console.log(`${agent.name} ha aceptado la tarea: minar en (${agent.task.x}, ${agent.task.y})`);
+            }
+            break;
+
+        case 'walking-to-task':
+            if (!agent.task) { agent.status = 'idle'; return; }
+            const task = agent.task;
+            const distanceX = Math.abs(agent.x - task.x);
+            const distanceY = Math.abs(agent.y - task.y);
+            // 'isAdjacent' es verdadero si está en un radio de 1 casilla (incluyendo diagonales)
+            const isAdjacent = distanceX <= 1 && distanceY <= 1;
+
+            // La condición de llegada es si está adyacente Y el objetivo sigue siendo una roca
+            const atDestination = isAdjacent && world[task.y][task.x].type === 'rock'
+            
+            if (atDestination) {
+                agent.status = 'working';
+            } else {
+                const dx = Math.sign(task.x - agent.x);
+                const dy = Math.sign(task.y - agent.y);
+                moveAgent(agent, world, dx, dy);
+            }
+            break;
+
+        case 'working':
+            if (!agent.task) { agent.status = 'idle'; return; }
+            console.log(`${agent.name} está minando en (${agent.task.x}, ${agent.task.y})`);
+            
+            const minedTile = world[agent.task.y][agent.task.x];
+            if (minedTile.type === 'rock') {
+                minedTile.type = 'floor';
+                minedTile.isTasked = false; // Desmarcamos el tile
+            
+            }
+
+            agent.task = null;
+            agent.status = 'idle';
+            break;
     }
 }
 
-
 // --- RENDERIZADO (VIEW) ---
 
-/**
- * Dibuja el mundo en el DOM basándose en el modelo de datos.
- * @param {Array<Array<Object>>} worldData - El array 2D que representa el mundo.
- * @param {Array<Object>} agentsData - El array de agentes.
- */
-
-function renderWorld(worldData, agentsData) {
+function renderWorld(world, agentsData) {
     const worldContainer = document.getElementById('game-world');
-    worldContainer.innerHTML = ''; 
+    worldContainer.innerHTML = '';
     worldContainer.style.setProperty('--world-width', WORLD_WIDTH);
     worldContainer.style.setProperty('--world-height', WORLD_HEIGHT);
 
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         for (let x = 0; x < WORLD_WIDTH; x++) {
-            const tileData = worldData[y][x];
+            const tileData = world[y][x];
             const tileElement = document.createElement('div');
             tileElement.classList.add('tile', `tile-${tileData.type}`);
+            tileElement.dataset.x = x;
+            tileElement.dataset.y = y;
+            tileElement.textContent = '';
 
-            // --- LÓGICA DE RENDERIZADO MEJORADA ---
-            // Por defecto, un tile no tiene texto.
-            tileElement.textContent = ''; 
+            if (tileData.isTasked) {
+                tileElement.classList.add('tile-rock-tasked');
+            }
 
-            // Si el tile es una roca, le ponemos su símbolo.
             if (tileData.type === 'rock') {
                 tileElement.textContent = '#';
             }
 
-            // Buscamos si hay un agente en esta coordenada (x, y).
             const agent = agentsData.find(a => a.x === x && a.y === y);
             if (agent) {
-                // Si hay un agente, dibujamos su caracter y le damos su color.
                 tileElement.textContent = agent.char;
                 tileElement.style.color = agent.color;
-                tileElement.style.fontWeight = 'bold'; // Lo ponemos en negrita
+                tileElement.style.fontWeight = 'bold';
             }
-
             worldContainer.appendChild(tileElement);
         }
     }
-    console.log("Renderizado del mundo y agentes completado.");
 }
-
 
 // --- INICIO DEL JUEGO ---
 
-// Nos aseguramos de que el script se ejecute solo cuando el DOM esté completamente cargado
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM cargado. Iniciando simulación.");
-    
-    // 1. Generar los datos del mundo
-    const worldData = generateWorld();
-    
-    // 2. Crear nuestro primer agente ---
-    createAgent(10, 5); // Lo creamos en la posición (10, 5)
-
-    // 3. Renderizar todo en la pantalla
+function updateGame() {
+    updateAgents(worldData, agents);
     renderWorld(worldData, agents);
-    
-    document.addEventListener('keydown', (event) => {
-        const player = agents[0];
-        if (!player) return;
-    
-        // Definimos el movimiento basado en la tecla
-        let dx = 0, dy = 0;
-        switch (event.key) {
-            case 'ArrowUp':    dy = -1; break;
-            case 'ArrowDown':  dy = 1;  break;
-            case 'ArrowLeft':  dx = -1; break;
-            case 'ArrowRight': dx = 1;  break;
-            default: return; // Si no es una tecla de flecha, no hacer nada
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    worldData = generateWorld();
+    createAgent(10, 5);
+    renderWorld(worldData, agents);
+
+    const worldContainer = document.getElementById('game-world');
+    worldContainer.addEventListener('click', (event) => {
+        const clickedTile = event.target;
+        if (!clickedTile.classList.contains('tile')) return;
+        const x = parseInt(clickedTile.dataset.x);
+        const y = parseInt(clickedTile.dataset.y);
+        if (worldData[y][x].type === 'rock') {
+            createTask(x, y, 'mine');
         }
-    
-        // 1. Intentar mover el agente (actualizar el modelo de datos)
-        moveAgent(player, worldData, dx, dy);
-    
-        // 2. Volver a dibujar todo el mundo con la nueva posición (actualizar la vista)
-        renderWorld(worldData, agents);
     });
+    
+    const gameLoop = setInterval(updateGame, 200);
 });

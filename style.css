@@ -57,3 +57,7 @@ main {
   
     color: #888;
 }
+.tile-rock-tasked {
+    box-shadow: 0 0 5px 2px #ffeb3b; /* Un brillo amarillo para indicar tarea */
+    border: 1px dotted #ffeb3b;
+}
