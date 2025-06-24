@@ -51,6 +51,33 @@ function createAgent(x, y) {
     };
     agents.push(agent);
 }
+/**
+ * --- NUEVO ---
+ * Intenta mover un agente en una dirección, verificando colisiones.
+ * @param {Object} agent - El agente a mover.
+ * @param {Array<Array<Object>>} worldData - Los datos del mundo para la colisión.
+ * @param {number} dx - El cambio en X (-1 para izq, 1 para der, 0 si no hay mov).
+ * @param {number} dy - El cambio en Y (-1 para arriba, 1 para abajo, 0 si no hay mov).
+ */
+function moveAgent(agent, worldData, dx, dy) {
+    const newX = agent.x + dx;
+    const newY = agent.y + dy;
+
+    // Verificación de límites del mundo (nunca debería pasar con las paredes, pero es buena práctica)
+    if (newX < 0 || newX >= WORLD_WIDTH || newY < 0 || newY >= WORLD_HEIGHT) {
+        return; 
+    }
+
+    // Detección de Colisiones
+    const targetTile = worldData[newY][newX];
+    if (targetTile.type !== 'rock') {
+        // Si no es una roca, actualizamos la posición del agente
+        agent.x = newX;
+        agent.y = newY;
+    } else {
+        console.log(`¡Auch! ${agent.name} se chocó contra una pared.`);
+    }
+}
 
 
 // --- RENDERIZADO (VIEW) ---
@@ -112,5 +139,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Renderizar todo en la pantalla
     renderWorld(worldData, agents);
+    
+    document.addEventListener('keydown', (event) => {
+        const player = agents[0];
+        if (!player) return;
+    
+        // Definimos el movimiento basado en la tecla
+        let dx = 0, dy = 0;
+        switch (event.key) {
+            case 'ArrowUp':    dy = -1; break;
+            case 'ArrowDown':  dy = 1;  break;
+            case 'ArrowLeft':  dx = -1; break;
+            case 'ArrowRight': dx = 1;  break;
+            default: return; // Si no es una tecla de flecha, no hacer nada
+        }
+    
+        // 1. Intentar mover el agente (actualizar el modelo de datos)
+        moveAgent(player, worldData, dx, dy);
+    
+        // 2. Volver a dibujar todo el mundo con la nueva posición (actualizar la vista)
+        renderWorld(worldData, agents);
+    });
 });
-
