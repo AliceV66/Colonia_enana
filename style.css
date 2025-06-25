@@ -1,4 +1,4 @@
-/* Usaremos una fuente monoespaciada, clave para la estética roguelike */
+/* Fuente monoespaciada para estética roguelike */
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
 
 body {
@@ -26,16 +26,12 @@ main {
 }
 
 #game-world {
-    display: grid; /* Usamos CSS Grid para dibujar nuestro mapa */
+    display: grid; /* Mapa con CSS Grid */
     border: 2px solid #555;
-    
-    /* Las variables --world-width y --world-height serán definidas por JS */
-    /* Esto hace que nuestro CSS sea dinámico */
     grid-template-columns: repeat(var(--world-width, 10), 1fr);
     grid-template-rows: repeat(var(--world-height, 10), 1fr);
 }
 
-/* Estilo base para cada "tile" o celda del mapa */
 .tile {
     width: 20px;
     height: 20px;
@@ -45,19 +41,17 @@ main {
     font-size: 16px;
 }
 
-/* Estilos específicos para cada tipo de tile */
 .tile-floor {
     background-color: #353535;
 }
 
 .tile-rock {
     background-color: #5a5a5a;
-    /* Usamos el pseudoelemento ::before para poner el caracter sin tocar el HTML */
-    /* Así, en el futuro, podemos poner un enano u otro objeto en el mismo tile */
-  
     color: #888;
 }
+
+/* Resalta roca con tarea asignada */
 .tile-rock-tasked {
-    box-shadow: 0 0 5px 2px #ffeb3b; /* Un brillo amarillo para indicar tarea */
+    box-shadow: 0 0 5px 2px #ffeb3b;
     border: 1px dotted #ffeb3b;
 }
